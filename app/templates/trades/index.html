@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        table {
+            font-family: arial, sans-serif;
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        td, th {
+            border: 1px solid #dddddd;
+            text-align: left;
+            padding: 8px;
+        }
+    </style>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/nanobar/0.2.1/nanobar.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+    <script>
+        function train(market, granularity, training_mode) {
+            div = $('<div class="progress"><div></div><div>0%</div><div>...</div><div>&nbsp;</div></div>');
+            $('#'+ market +'_progress').append(div);
+            // create a progress bar
+            var nanobar = new Nanobar({
+                bg: '#44f',
+                target: div[0].childNodes[0]
+            });
+            // send ajax POST request to start train in background
+            $.ajax({
+                type: 'POST',
+                url: '/neural/api/v1.0/train/',
+                data: JSON.stringify({market: market, granularity: granularity, training_mode: training_mode}, null, '\t'),
+                contentType: 'application/json;charset=UTF-8',
+                success: function(data, status, request) {
+                    status_url = data['Location'];
+                    error_placeholder = $('#error_'+market)
+                    update_progress(status_url, nanobar, div[0], market);
+                },
+                error: function() {
+                    alert('Unexpected error');
+                }
+            });
+
+        }
+        function predict(market, granularity) {
+           $('#summary_' + market).html('<p> Please wait....</p>')
+           $.ajax({
+                type: 'GET',
+                url: '/neural/api/v1.0/predict?market=' + market + '&granularity='+granularity ,
+                contentType: 'application/json;charset=UTF-8',
+                success: function(data, status, request) {
+                    console.log(data)
+                    if (data['message'] != undefined) {
+                        $('#summary_' + market).html(data['message'])
+                        return
+                    }
+                    html = '<table>'
+                    result = data.parameters
+                    for (var key in result) {
+                        html += '<tr><td>' + key + '</td><td>' + result[key] + '</tr>' 
+                    }
+                    html += '</table>'
+                    $('#summary_' + market).html(html)
+                },
+                error: function() {
+                    alert('Unexpected error');
+                }
+            }); 
+        }
+        function update_network_error(market) {
+             $.ajax({
+                type: 'GET',
+                url: '/neural/api/v1.0/get_network_error?market=' + market ,
+                contentType: 'application/json;charset=UTF-8',
+                success: function(data, status, request) {
+                   console.log(data)
+                   html = '<table>'
+                   result = data.parameters
+                   for (var key in result) {
+                        html += '<tr><td>' + key + '</td><td>' + result[key] + '</tr>' 
+                    }
+                    html += '</table>'
+                    $('#error_' + market).html(html)
+                },
+                error: function() {
+                    alert('Unexpected error');
+                }
+            });
+        }
+        function update_trades(market) {
+            $.ajax({
+                type: 'GET',
+                url: '/trades/latest_updates?market=' + market ,
+                contentType: 'application/json;charset=UTF-8',
+                success: function(data, status, request) {
+                   console.log(data)
+                },
+                error: function() {
+                    alert('Unexpected error');
+                }
+            });
+        }
+        $(function() {
+        //    $('#predict').click(start_long_task);
+            $("button").click(function() {
+                var fired_button = $(this).val();
+                setTimeout(function() {
+                  setInterval(function() {
+                    update_trades(fired_button)
+                  }, 10000);
+                }, 2000);
+            });
+        });
+        
+    </script>
+</head>
+<body>
+<button id='{{coin}}'> Start Monitoring {{coin['name']}}</button>
+<br>
+<br>
+<table>
+  <thead>
+      <tr>
+        <th>Trades count</th>
+        <th>Network Error</th>
+        <th>Predicted value</th>
+        <th>Time for prediction made</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td>0</td>
+        <td>0</td>
+        <td>0</td>
+        <td>NA</td>
+    </tr>
+  </tbody>
+    
+</table>
+
+</body>
+</html>
